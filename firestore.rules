@@ -1,0 +1,215 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL HELPERS ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (request.auth.token.email == 'studiopixy64@gmail.com' && request.auth.token.email_verified == true)
+      );
+    }
+
+    // --- VALIDATION HELPERS ---
+    function isValidService(data) {
+      return data.name is string && data.name.size() >= 1 && data.name.size() <= 80 &&
+             data.nameHindi is string && data.nameHindi.size() <= 100 &&
+             data.category in ['PHOTO_FRAMES', 'PASSPORT_PHOTO', 'PHOTOGRAPHY_SERVICES', 'PHOTO_PRINTING'] &&
+             data.priceInr is int && data.priceInr >= 0 && data.priceInr <= 10000000 &&
+             data.unitLabel is string && data.unitLabel.size() >= 1 && data.unitLabel.size() <= 40 &&
+             data.description is string && data.description.size() <= 400 &&
+             data.imageKey is string && data.imageKey.size() <= 250000 &&
+             data.popular is bool &&
+             data.active is bool &&
+             data.sortOrder is int && data.sortOrder >= 0 && data.sortOrder <= 10000 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidBusinessConfig(data) {
+      return data.businessName is string && data.businessName.size() >= 1 && data.businessName.size() <= 60 &&
+             data.tagline is string && data.tagline.size() <= 140 &&
+             data.whatsappNumber is string && data.whatsappNumber.size() >= 7 && data.whatsappNumber.size() <= 20 &&
+             data.phoneNumber is string && data.phoneNumber.size() >= 7 && data.phoneNumber.size() <= 20 &&
+             data.address is string && data.address.size() >= 3 && data.address.size() <= 240 &&
+             data.email is string && data.email.size() >= 3 && data.email.size() <= 120 &&
+             data.openingHours is string && data.openingHours.size() >= 3 && data.openingHours.size() <= 160 &&
+             data.googleMapsQuery is string && data.googleMapsQuery.size() >= 2 && data.googleMapsQuery.size() <= 200 &&
+             data.offerBadge is string && data.offerBadge.size() <= 60 &&
+             data.offerDescription is string && data.offerDescription.size() <= 240 &&
+             data.aboutDescription is string && data.aboutDescription.size() <= 1200 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidOrder(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.customerEmail is string && data.customerEmail.size() <= 120 &&
+             data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 80 &&
+             data.customerPhone is string && data.customerPhone.size() >= 7 && data.customerPhone.size() <= 20 &&
+             data.requirements is string && data.requirements.size() <= 600 &&
+             data.items is list && data.items.size() >= 1 && data.items.size() <= 30 && data.items[0] is map &&
+             data.totalQuantity is int && data.totalQuantity >= 1 && data.totalQuantity <= 1000 &&
+             data.totalAmountInr is int && data.totalAmountInr >= 0 && data.totalAmountInr <= 50000000 &&
+             data.status in ['PENDING', 'CONFIRMED', 'COMPLETED'] &&
+             data.adminNotes is string && data.adminNotes.size() <= 400 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidReview(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 60 &&
+             data.rating is int && data.rating >= 1 && data.rating <= 5 &&
+             data.serviceUsed is string && data.serviceUsed.size() >= 1 && data.serviceUsed.size() <= 80 &&
+             data.comment is string && data.comment.size() >= 2 && data.comment.size() <= 400 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidCustomerProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+             data.email is string && data.email.size() <= 120 &&
+             data.phone is string && data.phone.size() <= 20 &&
+             data.notes is string && data.notes.size() <= 400 &&
+             data.orderCount is int && data.orderCount >= 0 && data.orderCount <= 100000 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // --- 1. SERVICES CATALOG (Non-PII shared catalog; Admin-only mutations) ---
+    match /services/{serviceId} {
+      allow get: if isSignedIn() && isValidId(serviceId);
+      allow list: if isSignedIn();
+
+      allow create: if isAdmin() &&
+                       isValidId(serviceId) &&
+                       incoming().keys().hasAll(['name', 'nameHindi', 'category', 'priceInr', 'unitLabel', 'description', 'imageKey', 'popular', 'active', 'sortOrder', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['name', 'nameHindi', 'category', 'priceInr', 'unitLabel', 'description', 'imageKey', 'popular', 'active', 'sortOrder', 'createdAt', 'updatedAt']) &&
+                       isValidService(incoming());
+
+      allow update: if isAdmin() &&
+                       isValidId(serviceId) &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidService(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'nameHindi', 'category', 'priceInr', 'unitLabel', 'description', 'imageKey', 'popular', 'active', 'sortOrder', 'updatedAt']);
+
+      allow delete: if isAdmin() && isValidId(serviceId);
+    }
+
+    // --- 2. BUSINESS CONFIGURATION (Singleton studio_profile; Admin-only mutations) ---
+    match /business_config/{configId} {
+      allow get: if isSignedIn() && configId == 'studio_profile';
+      allow list: if false;
+
+      allow create: if isAdmin() &&
+                       configId == 'studio_profile' &&
+                       incoming().keys().hasAll(['businessName', 'tagline', 'whatsappNumber', 'phoneNumber', 'address', 'email', 'openingHours', 'googleMapsQuery', 'offerBadge', 'offerDescription', 'aboutDescription', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['businessName', 'tagline', 'whatsappNumber', 'phoneNumber', 'address', 'email', 'openingHours', 'googleMapsQuery', 'offerBadge', 'offerDescription', 'aboutDescription', 'createdAt', 'updatedAt']) &&
+                       isValidBusinessConfig(incoming());
+
+      allow update: if isAdmin() &&
+                       configId == 'studio_profile' &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidBusinessConfig(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['businessName', 'tagline', 'whatsappNumber', 'phoneNumber', 'address', 'email', 'openingHours', 'googleMapsQuery', 'offerBadge', 'offerDescription', 'aboutDescription', 'updatedAt']);
+
+      allow delete: if false;
+    }
+
+    // --- 3. ORDERS (Customer PII isolated to owner or Admin; status managed by Admin) ---
+    match /orders/{orderId} {
+      allow get: if isSignedIn() && isValidId(orderId) && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn() &&
+                       isValidId(orderId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().status == 'PENDING' &&
+                       incoming().adminNotes == '' &&
+                       incoming().keys().hasAll(['userId', 'customerEmail', 'customerName', 'customerPhone', 'requirements', 'items', 'totalQuantity', 'totalAmountInr', 'status', 'adminNotes', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'customerEmail', 'customerName', 'customerPhone', 'requirements', 'items', 'totalQuantity', 'totalAmountInr', 'status', 'adminNotes', 'createdAt', 'updatedAt']) &&
+                       isValidOrder(incoming());
+
+      allow update: if isAdmin() &&
+                       isValidId(orderId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidOrder(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'adminNotes', 'updatedAt']);
+
+      allow delete: if isAdmin() && isValidId(orderId);
+    }
+
+    // --- 4. REVIEWS (Public authenticated testimonials; owner/admin can delete) ---
+    match /reviews/{reviewId} {
+      allow get: if isSignedIn() && isValidId(reviewId);
+      allow list: if isSignedIn();
+
+      allow create: if isSignedIn() &&
+                       isValidId(reviewId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['userId', 'authorName', 'rating', 'serviceUsed', 'comment', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'authorName', 'rating', 'serviceUsed', 'comment', 'createdAt', 'updatedAt']) &&
+                       isValidReview(incoming());
+
+      allow update: if false;
+      allow delete: if isSignedIn() && isValidId(reviewId) && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    // --- 5. CUSTOMER PROFILES (Strict PII isolation: owner or Admin) ---
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().notes == '' &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'email', 'phone', 'notes', 'orderCount', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'email', 'phone', 'notes', 'orderCount', 'createdAt', 'updatedAt']) &&
+                       isValidCustomerProfile(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidCustomerProfile(incoming()) && (
+                         (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'phone', 'notes', 'orderCount', 'updatedAt'])) ||
+                         (request.auth.uid == userId && incoming().notes == existing().notes && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'phone', 'orderCount', 'updatedAt']))
+                       );
+
+      allow delete: if isAdmin() && isValidId(userId);
+    }
+
+    // --- 6. ADMIN REGISTRY (Read-only for self-check; never client-writable) ---
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && isValidId(adminId) && request.auth.uid == adminId;
+      allow list, create, update, delete: if false;
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Studio Pixy",
+  "description": "Photography studio, custom photo frames, passport photos, printing & WhatsApp ordering app for Studio Pixy.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

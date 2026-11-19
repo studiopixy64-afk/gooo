@@ -1,0 +1,135 @@
+{
+  "entities": {
+    "StudioService": {
+      "title": "StudioService",
+      "description": "Photography, framing, passport photo, or printing service with admin-editable pricing.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Service display name" },
+        "nameHindi": { "type": "string", "description": "Simple Hindi-friendly subtitle" },
+        "category": {
+          "type": "string",
+          "enum": ["PHOTO_FRAMES", "PASSPORT_PHOTO", "PHOTOGRAPHY_SERVICES", "PHOTO_PRINTING"],
+          "description": "Service category key"
+        },
+        "priceInr": { "type": "integer", "description": "Editable service price in INR" },
+        "unitLabel": { "type": "string", "description": "Unit label such as per frame or per package" },
+        "description": { "type": "string", "description": "Service description" },
+        "imageKey": { "type": "string", "description": "Drawable key, URL, or base64 data URI" },
+        "popular": { "type": "boolean", "description": "Whether highlighted as popular" },
+        "active": { "type": "boolean", "description": "Whether currently available" },
+        "sortOrder": { "type": "integer", "description": "Display ordering index" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update" }
+      },
+      "required": ["name", "nameHindi", "category", "priceInr", "unitLabel", "description", "imageKey", "popular", "active", "sortOrder", "createdAt", "updatedAt"]
+    },
+    "BusinessConfig": {
+      "title": "BusinessConfig",
+      "description": "Editable Studio Pixy contact information, opening hours, and special offers.",
+      "type": "object",
+      "properties": {
+        "businessName": { "type": "string" },
+        "tagline": { "type": "string" },
+        "whatsappNumber": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "address": { "type": "string" },
+        "email": { "type": "string" },
+        "openingHours": { "type": "string" },
+        "googleMapsQuery": { "type": "string" },
+        "offerBadge": { "type": "string" },
+        "offerDescription": { "type": "string" },
+        "aboutDescription": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["businessName", "tagline", "whatsappNumber", "phoneNumber", "address", "email", "openingHours", "googleMapsQuery", "offerBadge", "offerDescription", "aboutDescription", "createdAt", "updatedAt"]
+    },
+    "StudioOrder": {
+      "title": "StudioOrder",
+      "description": "Customer order placed for Studio Pixy services and routed via WhatsApp.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "customerEmail": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "requirements": { "type": "string" },
+        "items": { "type": "array" },
+        "totalQuantity": { "type": "integer" },
+        "totalAmountInr": { "type": "integer" },
+        "status": { "type": "string", "enum": ["PENDING", "CONFIRMED", "COMPLETED"] },
+        "adminNotes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "customerEmail", "customerName", "customerPhone", "requirements", "items", "totalQuantity", "totalAmountInr", "status", "adminNotes", "createdAt", "updatedAt"]
+    },
+    "StudioReview": {
+      "title": "StudioReview",
+      "description": "Customer testimonial and star rating for Studio Pixy.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "rating": { "type": "integer" },
+        "serviceUsed": { "type": "string" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "authorName", "rating", "serviceUsed", "comment", "createdAt", "updatedAt"]
+    },
+    "CustomerProfile": {
+      "title": "CustomerProfile",
+      "description": "Customer profile and contact record isolated per user and readable by studio admin.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "notes": { "type": "string" },
+        "orderCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "displayName", "email", "phone", "notes", "orderCount", "createdAt", "updatedAt"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Server-managed trusted admin UID record.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" }
+      },
+      "required": ["email"]
+    }
+  },
+  "firestore": {
+    "/services/{serviceId}": {
+      "schema": { "$ref": "#/entities/StudioService" },
+      "description": "Catalog of Studio Pixy services and editable prices."
+    },
+    "/business_config/{configId}": {
+      "schema": { "$ref": "#/entities/BusinessConfig" },
+      "description": "Singleton studio_profile document with Studio Pixy contact details, hours, and offers."
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/StudioOrder" },
+      "description": "Customer orders isolated by userId and managed by studio admin."
+    },
+    "/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/StudioReview" },
+      "description": "Customer reviews for Studio Pixy."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/CustomerProfile" },
+      "description": "Customer contact profiles isolated by userId and accessible to studio admin."
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Trusted admin UID registry."
+    }
+  }
+}
